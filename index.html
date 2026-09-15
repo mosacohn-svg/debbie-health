@@ -10,7 +10,8 @@
 <meta name="apple-mobile-web-app-status-bar-style" content="default">
 <meta name="apple-mobile-web-app-title" content="דבי">
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Crect width='100' height='100' rx='22' fill='%235b8c7a'/%3E%3Ctext x='50' y='68' font-size='52' text-anchor='middle'%3E%F0%9F%8C%BF%3C/text%3E%3C/svg%3E">
-<link rel="manifest" href='data:application/manifest+json,{"name":"הבריאות של דבי","short_name":"דבי","start_url":".","display":"standalone","background_color":"%23faf7f2","theme_color":"%235b8c7a","dir":"rtl","lang":"he","icons":[{"src":"data:image/svg+xml,%3Csvg xmlns=%27http://www.w3.org/2000/svg%27 viewBox=%270 0 100 100%27%3E%3Crect width=%27100%27 height=%27100%27 rx=%2722%27 fill=%27%235b8c7a%27/%3E%3Ctext x=%2750%27 y=%2768%27 font-size=%2752%27 text-anchor=%27middle%27%3E%F0%9F%8C%BF%3C/text%3E%3C/svg%3E","sizes":"any","type":"image/svg+xml"}]}'>
+<link rel="manifest" href="manifest.json">
+<link rel="apple-touch-icon" href="icon-192.png">
 <style>
 :root{
   --bg:#faf7f2; --card:#ffffff; --ink:#2b2f2c; --muted:#6f7772; --line:#e8e3da;
@@ -683,6 +684,8 @@ function resetAll(){if(!confirm('לאפס את כל הנתונים? זה ימח�
 /* ===================== boot ===================== */
 load();render();
 document.addEventListener('visibilitychange',()=>{if(!document.hidden)render();});
+// service worker — התקנה כאפליקציה + אופליין (עובד רק מכתובת https, לא מקובץ מקומי)
+if('serviceWorker' in navigator&&location.protocol.startsWith('http'))navigator.serviceWorker.register('sw.js').catch(()=>{});
 </script>
 </body>
 </html>
