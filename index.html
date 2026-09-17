@@ -144,7 +144,7 @@ table.wk td:first-child,table.wk th:first-child{text-align:right}
 
 <script>
 /* ===================== constants ===================== */
-const KEY='debbie-health-v1', BKEY='debbie-health-v1-backup', SCHEMA=2;
+const KEY='debbie-health-v1', BKEY='debbie-health-v1-backup', SCHEMA=3;
 const MEALS=[
   {id:'breakfast',l:'בוקר',ic:'🌅',from:5,to:10},
   {id:'snack',l:'ביניים',ic:'🍪',from:10,to:12},
@@ -247,17 +247,28 @@ const fromKey=k=>{const [y,m,d]=k.split('-').map(Number);return new Date(y,m-1,d
 const addDays=(k,n)=>{const d=fromKey(k);d.setDate(d.getDate()+n);return dkey(d);};
 const nowTime=()=>{const d=new Date();return pad(d.getHours())+':'+pad(d.getMinutes());};
 const weekStartOf=k=>{const d=fromKey(k);d.setDate(d.getDate()-d.getDay());return dkey(d);};
-const fmtDate=k=>{const d=fromKey(k);let s=`יום ${DAYS[d.getDay()]}, ${d.getDate()} ב${new Intl.DateTimeFormat('he-IL',{month:'long'}).format(d)}`;try{s+=' · '+new Intl.DateTimeFormat('he-IL-u-ca-hebrew',{day:'numeric',month:'long'}).format(d);}catch(e){}return s;};
-const shortDate=k=>{const d=fromKey(k);return `${d.getDate()}/${d.getMonth()+1}`;};
+// תאריך עברי — מספר לאותיות (גימטריה) + שמות חודשים
+function gem(n){const L=[[400,'ת'],[300,'ש'],[200,'ר'],[100,'ק'],[90,'צ'],[80,'פ'],[70,'ע'],[60,'ס'],[50,'נ'],[40,'מ'],[30,'ל'],[20,'כ'],[10,'י'],[9,'ט'],[8,'ח'],[7,'ז'],[6,'ו'],[5,'ה'],[4,'ד'],[3,'ג'],[2,'ב'],[1,'א']];let s='';for(const [v,c] of L)while(n>=v){s+=c;n-=v;}s=s.replace('יה','טו').replace('יו','טז');return s.length===1?s+'׳':s.slice(0,-1)+'״'+s.slice(-1);}
+const HEB_MONTHS={Tishri:'תשרי',Heshvan:'חשוון',Kislev:'כסלו',Tevet:'טבת',Shevat:'שבט','Adar I':'אדר א׳',Adar:'אדר','Adar II':'אדר ב׳',Nisan:'ניסן',Iyar:'אייר',Sivan:'סיוון',Tamuz:'תמוז',Av:'אב',Elul:'אלול'};
+const hebCache={};
+function hebParts(k){if(hebCache[k])return hebCache[k];try{const p=new Intl.DateTimeFormat('en-u-ca-hebrew',{day:'numeric',month:'long',year:'numeric'}).formatToParts(fromKey(k));const g=t=>(p.find(x=>x.type===t)||{}).value;const m=HEB_MONTHS[g('month')]||g('month');return hebCache[k]={d:gem(+g('day')),m,y:gem(+g('year')%1000)};}catch(e){return null;}}
+const hebDate=k=>{const h=hebParts(k);return h?`${h.d} ב${h.m} ${h.y}`:'';};
+const hebShort=k=>{const h=hebParts(k);return h?`${h.d} ${h.m}`:'';};
+const gregShort=k=>{const d=fromKey(k);return `${d.getDate()}.${d.getMonth()+1}.${d.getFullYear()}`;};
+const fmtDate=k=>{const d=fromKey(k);const h=hebDate(k);return `יום ${DAYS[d.getDay()]}, ${h||`${d.getDate()} ב${new Intl.DateTimeFormat('he-IL',{month:'long'}).format(d)}`}`;};
+const shortDate=k=>hebShort(k)||`${fromKey(k).getDate()}/${fromKey(k).getMonth()+1}`;
 const pick=arr=>arr[Math.floor(Math.random()*arr.length)];
 const avg=a=>a.length?a.reduce((x,y)=>x+y,0)/a.length:null;
 let toastT;function toast(m){const t=$('#toast');t.textContent=m;t.classList.add('show');clearTimeout(toastT);toastT=setTimeout(()=>t.classList.remove('show'),1800);}
 
 /* ===================== state ===================== */
-function seedFoods(){return SEED.map(r=>({id:uid(),name:r[0],type:r[1],cat:r[2],meals:r[3].split(','),status:r[4],prep:r[5],effort:r[6],ingredients:r[7]?r[7].split(','):[],shabbat:!!r[8],notes:r[9],groups:r[10]?r[10].split(','):[],fav:false}));}
+// הערכת קלוריות למנה (לפי שם) — הערכה גסה למנה ממוצעת, לא מדידה
+const KCAL={'חביתה עם לחם':350,'פיתה עם חביתה':380,'טוסט גבינה צהובה':320,'ביצה + טוסט + גבינה':400,'ביצים + קוטג׳ + לחם':380,'יוגורט עם גרנולה':300,'דייסת קוואקר עם דבש':300,'קורנפלקס עם חלב':280,'פיתה עם גבינה לבנה':300,'שקשוקה (רוטב מרוסק בלבד)':400,'ביצים קשות עם לחם':300,'פנקייק':450,'טוסט עם טחינה ודבש':350,'לחם עם חמאת בוטנים':350,'טונה עם פיתה':400,'שניצל + פירה':700,'שניצל בפיתה':600,'חזה עוף בתנור + אורז':550,'אורז + קציצות בשר':650,'קציצות עוף ברוטב + פתיתים':600,'פסטה ברוטב עגבניות':450,'פסטה עם גבינה':600,'פסטה עם טונה':550,'פתיתים עם עוף':550,'קוסקוס עם מרק':600,'תפוח אדמה אפוי עם גבינה':400,'דג אפוי + תפוחי אדמה':500,'סלמון בתנור + אורז':600,'מג׳דרה (עדשים ואורז)':450,'שעועית ברוטב + אורז':500,'חומוס עם פיתה':450,'פיצה-פיתה':400,'עוף בתנור + תפוחי אדמה':650,'בשר בתנור עם אורז':700,'מרק עוף':250,'מרק ירקות מרוסק':150,'מרק עדשים':250,'מרק בצל':250,'מרק כתום':150,'מרק שעועית':250,'מרק תפוחי אדמה':220,'מרק אפונה':250,'אגוזים ושקדים':200,'שוקולד מריר':150,'קרקרים עם גבינה':200,'חטיף גרנולה':150,'יוגורט':120,'גביע קוטג׳':130,'ביצה קשה':75,'מעדן / פודינג':150,'ביסקוויטים עם תה':150,'תמרים':120,'תה צמחים':0,'חלב חם עם דבש':150,'חלב שקדים':40,'שוקו':180,'אורז לבן':200,'פירה':250,'פתיתים':200,'ירקות מבושלים רכים בתבשיל':80,'מרק עם חתיכות ירקות גדולות':180,'בטטה אפויה':150,'סלט ירקות':80,'מלפפון / עגבנייה חיים':20,'גזר / פלפל חי':30,'פירות טריים':80,'סלט פירות':120};
+function seedFoods(){return SEED.map(r=>({id:uid(),name:r[0],type:r[1],cat:r[2],meals:r[3].split(','),status:r[4],prep:r[5],effort:r[6],ingredients:r[7]?r[7].split(','):[],shabbat:!!r[8],notes:r[9],groups:r[10]?r[10].split(','):[],kcal:KCAL[r[0]]??null,fav:false}));}
+const DEFAULT_REMINDERS={water:{on:false,every:2,from:'08:00',to:'22:00'},meals:{on:false,breakfast:'08:00',lunch:'13:00',dinner:'19:00'},screen:{on:false,time:'22:00'},sleep:{on:false,time:'23:00'}};
 function defaultState(){const n=new Date().toISOString();return{
   schemaVersion:SCHEMA,createdAt:n,updatedAt:n,
-  settings:{name:'דבי',waterGoal:8,sleepGoal:7.5,bedtime:'23:00',wake:'07:00',height:null,routine:['בלי מסך שעה לפני השינה','תה צמחים / משהו חם','חדר חשוך ושקט','לישון באותה שעה']},
+  settings:{name:'דבי',waterGoalMl:2000,glassMl:250,sleepGoal:7.5,bedtime:'23:00',wake:'07:00',height:null,goalWeight:null,stepsGoal:6000,reminders:JSON.parse(JSON.stringify(DEFAULT_REMINDERS)),routine:['בלי מסך שעה לפני השינה','תה צמחים / משהו חם','חדר חשוך ושקט','לישון באותה שעה']},
   foods:seedFoods(),
   days:{},
   weights:[],            // [{k:'YYYY-MM-DD', kg:Number}]
@@ -275,11 +286,22 @@ function migrate(s){
   s.week=s.week||{start:null,slots:{}};
   s.days=s.days||{};
   s.weights=s.weights||[];
-  if(s.settings&&s.settings.height===undefined)s.settings.height=null;
+  s.settings=s.settings||defaultState().settings;
+  if(s.settings.height===undefined)s.settings.height=null;
   // מנות מגרסה קודמת בלי קבוצות תזונה — נגזור מהקטגוריה ומהמרכיבים
   (s.foods||[]).forEach(f=>{if(!f.groups){const g=new Set();if(CAT2GROUP[f.cat])g.add(CAT2GROUP[f.cat]);const ing=(f.ingredients||[]).join(' ');if(/ביצ|עוף|בשר|טונה|דג|סלמון|עדשים|שעועית|חומוס|קוטג/.test(ing+f.name))g.add('protein');if(/לחם|פיתה|פיתות|אורז|פסטה|פתיתים|קוסקוס|תפוחי אדמה|קמח|קורנפלקס|שיבולת/.test(ing))g.add('carb');if(/גבינה|יוגורט|חלב|קוטג|שמנת/.test(ing))g.add('dairy');if(/גזר|בטטה|דלעת|בצל|רסק/.test(ing)||f.cat==='מרק')g.add('veg');f.groups=[...g];}});
   // שדרוג לגרסה 2: מנות חדשות מהמאגר ההתחלתי שעדיין לא קיימות (לפי שם)
   if((s.schemaVersion||1)<2){const names=new Set((s.foods||[]).map(f=>f.name));seedFoods().forEach(f=>{if(!names.has(f.name))s.foods.push(f);});s.schemaVersion=2;}
+  // שדרוג לגרסה 3: מים במ״ל, קלוריות, צעדים, תזכורות, יעד משקל
+  if(s.schemaVersion<3){
+    const st=s.settings;
+    if(st.waterGoalMl==null)st.waterGoalMl=(st.waterGoal||8)*250;
+    st.glassMl=st.glassMl||250;st.stepsGoal=st.stepsGoal||6000;if(st.goalWeight===undefined)st.goalWeight=null;
+    for(const k in s.days){const d=s.days[k];if(d.waterMl==null)d.waterMl=(d.water||0)*250;}
+    s.schemaVersion=3;
+  }
+  s.settings.reminders=Object.assign(JSON.parse(JSON.stringify(DEFAULT_REMINDERS)),s.settings.reminders||{});
+  (s.foods||[]).forEach(f=>{if(f.kcal===undefined)f.kcal=KCAL[f.name]??null;});
   return s;
 }
 function load(){
@@ -294,7 +316,7 @@ function save(){
     localStorage.setItem(KEY,JSON.stringify(S));
   }catch(e){toast('שגיאה בשמירה');console.error(e);}
 }
-function day(k=today()){if(!S.days[k])S.days[k]={water:0,meals:{},skipped:[],moods:[],sleep:null,routine:[],extra:[],lowEnergy:false};return S.days[k];}
+function day(k=today()){if(!S.days[k])S.days[k]={waterMl:0,steps:null,fired:[],meals:{},skipped:[],moods:[],sleep:null,routine:[],extra:[],lowEnergy:false};return S.days[k];}
 const food=id=>S.foods.find(f=>f.id===id);
 
 /* ===================== domain ===================== */
@@ -357,6 +379,11 @@ function generateWeek(){
   for(const d of [...Array(7).keys()].filter(d=>!vegDays.includes(d)).sort(()=>Math.random()-.5)){if(vegDays.length>=3)break;const m=Math.random()<.5?'lunch':'dinner';const c=pool(m).filter(f=>(f.groups||[]).includes('veg'));if(c.length){take(c,d,m);vegDays.push(d);}}
   S.week={start,slots};S.shopping.checked=[];save();
 }
+// קלוריות (הערכה) — סכום המנות שסומנו "אכלתי" + נשנושים שהוזנו עם קק״ל
+function kcalOf(k=today()){const d=S.days[k];if(!d)return 0;let t=0;Object.values(d.meals).forEach(m=>{if(m.eaten){const f=food(m.foodId);if(f&&f.kcal)t+=f.kcal;}});(d.extra||[]).forEach(e=>{if(e.kcal)t+=e.kcal;});return t;}
+function setSteps(v){day().steps=Math.max(0,Math.round(+v)||0)||null;save();toast('🚶 נשמר');render();}
+// ממוצעים לתקופה (לצורך מעקב התקדמות)
+function periodStats(from,to){const kc=[],st=[],wt=[],sl=[];for(let k=from;k<=to;k=addDays(k,1)){const d=S.days[k];if(!d)continue;const eat=Object.values(d.meals).some(m=>m.eaten);if(eat)kc.push(kcalOf(k));if(d.steps)st.push(d.steps);if(d.waterMl)wt.push(d.waterMl);if(d.sleep)sl.push(d.sleep.hours);}const w=S.weights.filter(x=>x.k>=from&&x.k<=to);return{kcal:avg(kc),steps:avg(st),water:avg(wt),sleep:avg(sl),weight:w.length?w[w.length-1].kg:null,days:kc.length};}
 // משקל
 const bmi=(kg,cm)=>kg&&cm?Math.round(kg/((cm/100)**2)*10)/10:null;
 function lastWeight(){return S.weights.length?S.weights[S.weights.length-1]:null;}
@@ -391,7 +418,7 @@ function render(){
 /* ===================== TODAY ===================== */
 function greeting(){const h=new Date().getHours();return h<5?'לילה טוב':h<12?'בוקר טוב':h<17?'צהריים טובים':h<21?'ערב טוב':'לילה טוב';}
 function renderToday(){
-  const k=today(),d=day(k),goal=S.settings.waterGoal,pct=Math.min(1,d.water/goal),r=50,C=2*Math.PI*r;
+  const k=today(),d=day(k),goal=S.settings.waterGoalMl,glass=S.settings.glassMl,pct=Math.min(1,d.waterMl/goal),r=50,C=2*Math.PI*r;
   const cur=currentMealType();
   const order=MEALS.map(m=>m.id);
   // הארוחה הבאה: הראשונה שלא סומנה, מתחילים מהארוחה הנוכחית לפי השעה
@@ -400,11 +427,11 @@ function renderToday(){
   const nm=next?MEALS.find(m=>m.id===next):null;
   const pf=next?food(plannedFoodId(k,next)):null;
   const lastMood=d.moods[d.moods.length-1];
-  let h=`<header style="margin-bottom:14px"><h1>${greeting()}, ${esc(S.settings.name)} 🌿</h1><div class="muted">${fmtDate(k)}</div></header>`;
+  let h=`<header style="margin-bottom:14px"><h1>${greeting()}, ${esc(S.settings.name)} 🌿</h1><div class="muted">${fmtDate(k)} <span class="small" style="opacity:.7">· ${gregShort(k)}</span></div></header>`;
 
   // מים
-  h+=`<section class="card"><div class="row between"><div class="ring"><svg width="118" height="118" viewBox="0 0 118 118"><circle cx="59" cy="59" r="${r}" fill="none" stroke="var(--water-soft)" stroke-width="10"/><circle cx="59" cy="59" r="${r}" fill="none" stroke="var(--water)" stroke-width="10" stroke-linecap="round" stroke-dasharray="${C}" stroke-dashoffset="${C*(1-pct)}" style="transition:stroke-dashoffset .3s"/></svg><div class="txt">${d.water}<small>מתוך ${goal} כוסות</small></div></div>
-    <div class="stack" style="align-items:center;flex:1"><div style="font-weight:700">💧 מים היום</div><div class="muted small" style="text-align:center">${d.water>=goal?'הגעת ליעד! 🎉':`עוד ${goal-d.water} ${goal-d.water===1?'כוס':'כוסות'} ליעד`}</div><div class="row"><button class="icon-btn" onclick="water(-1)" aria-label="הורד כוס">−</button><button class="icon-btn big" onclick="water(1)" aria-label="הוסף כוס">+</button></div></div></div></section>`;
+  h+=`<section class="card"><div class="row between"><div class="ring"><svg width="118" height="118" viewBox="0 0 118 118"><circle cx="59" cy="59" r="${r}" fill="none" stroke="var(--water-soft)" stroke-width="10"/><circle cx="59" cy="59" r="${r}" fill="none" stroke="var(--water)" stroke-width="10" stroke-linecap="round" stroke-dasharray="${C}" stroke-dashoffset="${C*(1-pct)}" style="transition:stroke-dashoffset .3s"/></svg><div class="txt" style="font-size:1.25rem">${d.waterMl}<small>מתוך ${goal} מ״ל</small></div></div>
+    <div class="stack" style="align-items:center;flex:1"><div style="font-weight:700">💧 מים היום</div><div class="muted small" style="text-align:center">${d.waterMl>=goal?'הגעת ליעד! 🎉':`עוד ${goal-d.waterMl} מ״ל ליעד`}</div><div class="row"><button class="icon-btn" onclick="water(-1)" aria-label="הורד כוס">−</button><button class="icon-btn big" onclick="water(1)" aria-label="הוסף כוס">+</button></div><div class="chips" style="justify-content:center;flex-wrap:nowrap;gap:4px">${[200,250,330,500].map(v=>`<button class="chip ${glass===v?'on':''}" style="padding:4px 8px" onclick="S.settings.glassMl=${v};save();renderToday()">${v}</button>`).join('')}</div><div class="muted small">גודל הכוס במ״ל</div></div></div></section>`;
 
   // שינה חסרה
   if(!d.sleep)h+=`<section class="card warn"><div class="row between"><div><b>😴 כמה ישנת הלילה?</b><div class="muted small">עוד לא דיווחת על השינה של אמש</div></div><button class="btn sm" onclick="sleepSheet()">דווחי</button></div></section>`;
@@ -432,10 +459,15 @@ function renderToday(){
   const cov=coveredGroups(k),miss=missingGroups(k),hour=new Date().getHours();
   h+=`<section class="card"><div class="row between"><h3>🥗 איזון היום</h3><span class="muted small">${cov.size?`${GROUPS_DAILY.length-miss.length} מתוך ${GROUPS_DAILY.length}`:'עוד לא סומנה ארוחה'}</span></div>
     <div class="chips" style="margin-top:8px">${GROUPS_DAILY.map(g=>`<span class="chip ${cov.has(g)?'on':''}">${GROUPS[g].ic} ${GROUPS[g].l} ${cov.has(g)?'✓':''}</span>`).join('')}</div>`;
+  const kc=kcalOf(k);if(kc)h+=`<div class="muted small" style="margin-top:8px">🔥 עד עכשיו ≈ <b>${kc.toLocaleString('he-IL')}</b> קק״ל (הערכה לפי המנות שסומנו)</div>`;
   if(next&&!cov.has('protein')&&hour>=11){const pp=proteinPicks(next);
     if(pp.length)h+=`<div class="divider"></div><div style="font-weight:600">🥚 עוד לא היה חלבון היום — כדאי ל${nm.l}:</div><div class="stack" style="margin-top:8px;gap:6px">${pp.map(f=>`<button class="btn outline block" style="justify-content:space-between" onclick="chooseSuggestion('${f.id}','${next}')"><span>${f.fav?'★ ':''}${esc(f.name)}</span><span class="muted small">⏱ ${PREPL[f.prep]} · ${EFFORT[f.effort]}</span></button>`).join('')}</div>`;}
   else if(miss.length&&cov.size)h+=`<div class="muted small" style="margin-top:8px">חסר עדיין: ${miss.map(g=>GROUPS[g].l).join(', ')} — ההצעות ב"מה כדאי לאכול" כבר לוקחות את זה בחשבון.</div>`;
   h+=`</section>`;
+
+  // צעדים — הזנה ידנית מהשעון
+  h+=`<section class="card"><div class="row between"><h3>🚶 צעדים היום</h3><span class="chip ${d.steps>=S.settings.stepsGoal?'on':''}">${d.steps?d.steps.toLocaleString('he-IL'):'—'} / ${S.settings.stepsGoal.toLocaleString('he-IL')}</span></div>
+    <form class="row" style="margin-top:8px" onsubmit="setSteps(this.s.value);return false"><input class="input grow" type="number" name="s" min="0" max="100000" step="100" inputmode="numeric" placeholder="מהשעון / מהטלפון" value="${d.steps||''}"><button class="btn sm">שמרי</button></form></section>`;
 
   // שגרת לילה — דיווח מהיר מהבית
   if(S.settings.routine.length){const done=d.routine.length,tot=S.settings.routine.length;
@@ -451,7 +483,7 @@ function renderToday(){
   $('#qa').innerHTML=`<button onclick="water(1)"><span class="ic">💧</span>+ כוס מים</button><button onclick="ateQuick()"><span class="ic">🍽️</span>אכלתי</button><button onclick="moodSheet()"><span class="ic">🙂</span>מצב רוח</button><button onclick="sleepSheet()"><span class="ic">😴</span>שינה</button>`;
 }
 function foodMeta(f){return `<span class="chip">⏱ ${PREPL[f.prep]||f.prep}</span><span class="chip">${f.effort==='easy'?'🟢':f.effort==='hard'?'🔴':'🟡'} ${EFFORT[f.effort]}</span><span class="chip">${esc(f.cat)}</span>`;}
-function water(n){const d=day();d.water=Math.max(0,d.water+n);save();if(S.ui.tab==='today')renderToday();if(n>0)toast(d.water>=S.settings.waterGoal?'הגעת ליעד המים! 🎉':'💧 נרשם');}
+function water(n){const d=day();d.waterMl=Math.max(0,d.waterMl+n*S.settings.glassMl);if(n>0)d.lastWaterT=Date.now();save();if(S.ui.tab==='today')renderToday();if(n>0)toast(d.waterMl>=S.settings.waterGoalMl?'הגעת ליעד המים! 🎉':`💧 +${S.settings.glassMl} מ״ל`);}
 function toggleLowEnergy(v){day().lowEnergy=v;save();renderToday();}
 function skipFood(fid,mealId){const d=day();if(!d.skipped.includes(fid))d.skipped.push(fid);if(d.meals[mealId]&&!d.meals[mealId].eaten)delete d.meals[mealId];save();toast('בסדר, לא נציע את זה היום');suggestSheet(mealId);}
 function saveMoodInline(){const m=+$('#view input[name=mood]').value,e=+$('#view input[name=energy]').value;if(!m&&!e)return toast('בחרי מצב רוח או אנרגיה');day().moods.push({t:nowTime(),mood:m||3,energy:e||3});save();toast('נשמר 💚');renderToday();}
@@ -477,10 +509,10 @@ function ateQuick(){
   const pending=MEALS.filter(m=>!(d.meals[m.id]&&d.meals[m.id].eaten));
   let h=`<h2>מה אכלת?</h2><div class="stack" style="margin-top:10px">`;
   for(const m of pending){const f=food(plannedFoodId(k,m.id));h+=`<button class="btn outline block" style="justify-content:space-between" onclick="ateSheet('${m.id}')"><span>${m.ic} ${m.l}</span><span class="muted small">${f?esc(f.name):'לא נבחר'}</span></button>`;}
-  h+=`</div><div class="divider"></div><form onsubmit="return addExtra(event)"><div class="field-title">משהו אחר / נשנוש</div><div class="row"><input class="input grow" name="name" placeholder="למשל: שוקולד, תה עם ביסקוויט" required><button class="btn">הוסיפי</button></div></form>`;
+  h+=`</div><div class="divider"></div><form onsubmit="return addExtra(event)"><div class="field-title">משהו אחר / נשנוש</div><div class="row wrap"><input class="input grow" name="name" placeholder="למשל: שוקולד, תה עם ביסקוויט" required style="min-width:160px"><input class="input" name="kcal" type="number" min="0" max="3000" step="10" inputmode="numeric" placeholder="קק״ל (לא חובה)" style="width:130px"><button class="btn">הוסיפי</button></div></form>`;
   openSheet(h);
 }
-function addExtra(ev){ev.preventDefault();const n=ev.target.name.value.trim();if(!n)return false;day().extra.push({t:nowTime(),name:n});save();closeSheet();toast('נרשם 🍪');render();return false;}
+function addExtra(ev){ev.preventDefault();const n=ev.target.name.value.trim();if(!n)return false;day().extra.push({t:nowTime(),name:n,kcal:+ev.target.kcal.value||null});save();closeSheet();toast('נרשם 🍪');render();return false;}
 function ateSheet(mealId){
   const k=today(),d=day(k),m=MEALS.find(x=>x.id===mealId);const fid=plannedFoodId(k,mealId);const f=food(fid);
   if(!f)return pickerSheet(k,mealId);
@@ -559,14 +591,14 @@ function renderFoods(){
   h+=`<div class="chips scroll" style="margin-bottom:12px"><button class="chip ${foodCat===''?'on':''}" onclick="foodCat='';renderFoods()">כל הקטגוריות</button>${CATS.map(c=>`<button class="chip ${foodCat===c?'on':''}" onclick="foodCat='${c}';renderFoods()">${c}</button>`).join('')}</div>`;
   h+=`<section class="card"><div class="list">`;
   if(!list.length)h+=`<div class="muted" style="padding:12px 0">לא נמצאו מנות</div>`;
-  for(const f of list)h+=`<div class="food"><button class="star ${f.fav?'on':''}" onclick="toggleFav('${f.id}')" aria-label="מועדף">${f.fav?'★':'☆'}</button><button class="info" style="text-align:right" onclick="foodSheet('${f.id}')"><div class="name">${esc(f.name)}</div><div class="meta"><span class="tag">${TYPES[f.type]}</span><span class="tag">${esc(f.cat)}</span><span class="tag">⏱ ${PREPL[f.prep]||f.prep}</span><span class="tag">${EFFORT[f.effort]}</span>${(f.groups||[]).includes('protein')?'<span class="tag">🥚 חלבון</span>':''}${S.ui.showAll&&f.status!=='yes'?`<span class="tag" style="color:var(--warn)">${STATUS[f.status]}</span>`:''}${f.shabbat?'<span class="tag">🕯 שבת</span>':''}</div></button><span class="muted">›</span></div>`;
+  for(const f of list)h+=`<div class="food"><button class="star ${f.fav?'on':''}" onclick="toggleFav('${f.id}')" aria-label="מועדף">${f.fav?'★':'☆'}</button><button class="info" style="text-align:right" onclick="foodSheet('${f.id}')"><div class="name">${esc(f.name)}</div><div class="meta"><span class="tag">${TYPES[f.type]}</span><span class="tag">${esc(f.cat)}</span><span class="tag">⏱ ${PREPL[f.prep]||f.prep}</span><span class="tag">${EFFORT[f.effort]}</span>${(f.groups||[]).includes('protein')?'<span class="tag">🥚 חלבון</span>':''}${f.kcal?`<span class="tag">🔥 ${f.kcal}</span>`:''}${S.ui.showAll&&f.status!=='yes'?`<span class="tag" style="color:var(--warn)">${STATUS[f.status]}</span>`:''}${f.shabbat?'<span class="tag">🕯 שבת</span>':''}</div></button><span class="muted">›</span></div>`;
   h+=`</div></section>`;
   $('#view').innerHTML=h;
   const inp=$('#view input');if(foodQ&&inp){inp.focus();inp.setSelectionRange(inp.value.length,inp.value.length);}
 }
 function toggleFav(id){const f=food(id);f.fav=!f.fav;save();renderFoods();toast(f.fav?'⭐ נוסף למועדפים':'הוסר מהמועדפים');}
 function foodSheet(id){
-  const f=id?food(id):{name:'',type:'meal',cat:'ארוחה',meals:['lunch','dinner'],status:'yes',prep:15,effort:'normal',ingredients:[],groups:[],shabbat:false,notes:'',fav:false};
+  const f=id?food(id):{name:'',type:'meal',cat:'ארוחה',meals:['lunch','dinner'],status:'yes',prep:15,effort:'normal',ingredients:[],groups:[],kcal:null,shabbat:false,notes:'',fav:false};
   openSheet(`<h2>${id?'עריכת מנה':'מנה חדשה'}</h2><form id="foodF" onsubmit="return saveFood(event,'${id||''}')" style="margin-top:10px">
   <label class="field"><span>שם</span><input class="input" name="name" value="${esc(f.name)}" required placeholder="למשל: שניצל + פירה"></label>
   <div class="field-title">סוג פריט</div>${segHtml('type',Object.entries(TYPES),f.type)}
@@ -577,13 +609,14 @@ function foodSheet(id){
   <div class="field-title">זמן הכנה</div>${segHtml('prep',Object.entries(PREPL),f.prep)}
   <div class="field-title" style="margin-top:12px">רמת מאמץ</div>${segHtml('effort',Object.entries(EFFORT),f.effort)}
   <label class="field" style="margin-top:12px"><span>מרכיבים (מופרדים בפסיק — לרשימת הקניות)</span><input class="input" name="ingredients" value="${esc(f.ingredients.join(', '))}" placeholder="ביצים, לחם, גבינה"></label>
+  <label class="field"><span>קלוריות למנה (הערכה, לא חובה)</span><input class="input" type="number" name="kcal" min="0" max="3000" step="10" inputmode="numeric" value="${f.kcal??''}" placeholder="למשל 350"></label>
   <label class="field"><span>הערות</span><textarea class="input" name="notes">${esc(f.notes)}</textarea></label>
   <label class="check"><input type="checkbox" name="fav" ${f.fav?'checked':''}><span>⭐ מועדף</span></label>
   <label class="check"><input type="checkbox" name="shabbat" ${f.shabbat?'checked':''}><span>🕯 מתאים לשבת</span></label>
   <div class="row" style="margin-top:14px;gap:8px"><button class="btn big grow">שמרי</button>${id?`<button type="button" class="btn danger" onclick="deleteFood('${id}')">מחקי</button>`:''}</div></form>`);
 }
 function saveFood(ev,id){ev.preventDefault();const o=formData('foodF');const meals=[].concat(o.meals||[]).filter(Boolean);if(!meals.length)return toast('סמני לאיזו ארוחה זה מתאים')||false;
-  const obj={name:o.name.trim(),type:o.type,cat:o.cat,meals,groups:[].concat(o.groups||[]).filter(Boolean),status:o.status,prep:+o.prep,effort:o.effort,ingredients:o.ingredients.split(',').map(s=>s.trim()).filter(Boolean),notes:o.notes.trim(),fav:o.fav==='on',shabbat:o.shabbat==='on'};
+  const obj={name:o.name.trim(),type:o.type,cat:o.cat,meals,groups:[].concat(o.groups||[]).filter(Boolean),status:o.status,prep:+o.prep,effort:o.effort,ingredients:o.ingredients.split(',').map(s=>s.trim()).filter(Boolean),notes:o.notes.trim(),kcal:+o.kcal||null,fav:o.fav==='on',shabbat:o.shabbat==='on'};
   if(id)Object.assign(food(id),obj);else S.foods.push(Object.assign({id:uid()},obj));
   save();closeSheet();render();toast('נשמר 💚');return false;}
 function deleteFood(id){if(!confirm('למחוק את המנה מהמאגר?'))return;S.foods=S.foods.filter(f=>f.id!==id);for(const k in S.week.slots)if(S.week.slots[k]===id)delete S.week.slots[k];save();closeSheet();render();toast('נמחק');}
@@ -628,9 +661,9 @@ function renderMore(){
   let h=`<header style="margin-bottom:14px"><h1>📖 יומן</h1></header>`;
   // תצוגה שבועית
   const wk=[...Array(7)].map((_,i)=>addDays(today(),i-6));
-  h+=`<section class="card"><h3>השבוע במבט אחד</h3><div style="overflow-x:auto;margin-top:8px"><table class="wk"><tr><th>יום</th><th>💧</th><th>😴</th><th>⚡</th><th>🙂</th><th>🍽</th></tr>`;
+  h+=`<section class="card"><h3>השבוע במבט אחד</h3><div style="overflow-x:auto;margin-top:8px"><table class="wk"><tr><th>יום</th><th>💧</th><th>😴</th><th>⚡</th><th>🙂</th><th>🍽</th><th>🔥</th><th>🚶</th></tr>`;
   for(const k of wk){const x=S.days[k];const e=x?avg(x.moods.map(m=>m.energy)):null,mo=x?avg(x.moods.map(m=>m.mood)):null,eat=x?Object.values(x.meals).filter(m=>m.eaten).length:0;
-    h+=`<tr style="${k===jk?'background:var(--accent-soft)':''}" onclick="S.ui.journalDay='${k}';save();renderMore()"><td><b>${DAYS[fromKey(k).getDay()].slice(0,3)}</b> <span class="muted">${shortDate(k)}</span></td><td>${x?x.water:'–'}</td><td>${x&&x.sleep?x.sleep.hours:'–'}</td><td>${e!=null?ENERGY[Math.round(e)-1][0]:'–'}</td><td>${mo!=null?MOODS[Math.round(mo)-1][0]:'–'}</td><td>${x?eat+'/4':'–'}</td></tr>`;}
+    h+=`<tr style="${k===jk?'background:var(--accent-soft)':''}" onclick="S.ui.journalDay='${k}';save();renderMore()"><td><b>${DAYS[fromKey(k).getDay()].slice(0,3)}</b> <span class="muted">${shortDate(k)}</span></td><td>${x?(x.waterMl/1000).toFixed(1)+'ל׳':'–'}</td><td>${x&&x.sleep?x.sleep.hours:'–'}</td><td>${e!=null?ENERGY[Math.round(e)-1][0]:'–'}</td><td>${mo!=null?MOODS[Math.round(mo)-1][0]:'–'}</td><td>${x?eat+'/4':'–'}</td><td>${x&&eat?kcalOf(k):'–'}</td><td>${x&&x.steps?x.steps:'–'}</td></tr>`;}
   h+=`</table></div><div class="muted small" style="margin-top:6px">לחצי על יום כדי לראות את הפירוט שלו</div></section>`;
   // יום נבחר
   const ev=[];
@@ -639,7 +672,7 @@ function renderMore(){
   d.moods.forEach(m=>ev.push({t:m.t,txt:`${MOODS[m.mood-1][0]} ${MOODS[m.mood-1][1]} · אנרגיה ${ENERGY[m.energy-1][0]} ${ENERGY[m.energy-1][1]}`}));
   ev.sort((a,b)=>a.t.localeCompare(b.t));
   h+=`<section class="card"><div class="row between"><button class="icon-btn" onclick="S.ui.journalDay='${addDays(jk,-1)}';save();renderMore()">›</button><h3>${jk===today()?'היום':'יום '+DAYS[fromKey(jk).getDay()]+' '+shortDate(jk)}</h3><button class="icon-btn" onclick="S.ui.journalDay='${addDays(jk,1)}';save();renderMore()" ${jk>=today()?'disabled style="opacity:.3"':''}>‹</button></div>
-  <div class="chips" style="margin:8px 0">${`<span class="chip">💧 ${d.water} כוסות</span>`}${d.sleep?`<span class="chip">😴 ${d.sleep.hours} ש׳</span>`:''}${d.lowEnergy?'<span class="chip warn">🪫 יום בלי כוח</span>':''}</div>
+  <div class="chips" style="margin:8px 0"><span class="chip">💧 ${d.waterMl} מ״ל</span>${d.steps?`<span class="chip">🚶 ${d.steps}</span>`:''}${kcalOf(jk)?`<span class="chip">🔥 ≈${kcalOf(jk)} קק״ל</span>`:''}${d.sleep?`<span class="chip">😴 ${d.sleep.hours} ש׳</span>`:''}${d.lowEnergy?'<span class="chip warn">🪫 יום בלי כוח</span>':''}</div>
   <div class="timeline">${ev.length?ev.map(e=>`<div class="t"><time>${e.t}</time><span>${e.txt}</span></div>`).join(''):'<div class="muted small">אין רישומים ביום הזה</div>'}</div>
   ${jk!==today()?`<button class="btn outline sm" style="margin-top:10px" onclick="sleepSheet('${jk}')">${d.sleep?'ערכי שינה':'הוסיפי שינה ליום הזה'}</button>`:''}</section>`;
   // גובה ומשקל
@@ -653,14 +686,34 @@ function renderMore(){
   if(ws.length>1){const W=280,H=100,min=Math.min(...ws.map(w=>w.kg))-1,max=Math.max(...ws.map(w=>w.kg))+1,sx=i=>W-10-(i*(W-20)/(ws.length-1)),sy=v=>H-18-((v-min)/(max-min))*(H-30);
     h+=`<svg class="chart" viewBox="0 0 ${W} ${H}" style="margin-top:12px;direction:ltr"><polyline fill="none" stroke="var(--accent)" stroke-width="2" points="${ws.map((w,i)=>sx(i)+','+sy(w.kg)).join(' ')}"/>${ws.map((w,i)=>`<circle cx="${sx(i)}" cy="${sy(w.kg)}" r="3.5" fill="var(--accent)"/><text x="${sx(i)}" y="${sy(w.kg)-7}" font-size="7" text-anchor="middle" fill="var(--muted)">${w.kg}</text><text x="${sx(i)}" y="${H-5}" font-size="7" text-anchor="middle" fill="var(--muted)">${shortDate(w.k)}</text>`).join('')}</svg>`;}
   if(S.weights.length)h+=`<details style="margin-top:8px"><summary class="muted small">כל השקילות (${S.weights.length})</summary><div class="list">${S.weights.slice().reverse().map(w=>`<div class="item"><span class="grow">${shortDate(w.k)} — <b>${w.kg}</b> ק״ג</span><button class="icon-btn" onclick="delWeight('${w.k}')" aria-label="מחק">✕</button></div>`).join('')}</div></details>`;
+  // התקדמות — משקל מול ממוצעי קק״ל / צעדים / מים / שינה, לפי שבועות
+  const gw=st.goalWeight;
+  if(gw&&first&&lw){const total=first.kg-gw,done=first.kg-lw.kg,p=total>0?Math.max(0,Math.min(1,done/total)):0;
+    h+=`<div class="divider"></div><div class="row between"><b>🎯 יעד: ${gw} ק״ג</b><span class="muted small">${total>0?`${Math.round(p*100)}% מהדרך · נשארו ${Math.max(0,Math.round((lw.kg-gw)*10)/10)} ק״ג`:'המשקל הנוכחי כבר ביעד או מתחתיו'}</span></div><div style="height:10px;background:var(--bg);border-radius:6px;margin-top:6px;overflow:hidden"><div style="height:100%;width:${Math.round(p*100)}%;background:var(--accent);border-radius:6px"></div></div>`;}
+  const wk0=weekStartOf(today());const rows=[0,1,2,3].map(i=>{const from=addDays(wk0,-7*i),to=addDays(from,6);return{from,to,...periodStats(from,to)};}).filter(r=>r.days||r.weight||r.steps);
+  if(rows.length){h+=`<div class="divider"></div><h3>📈 התקדמות לפי שבועות</h3><div style="overflow-x:auto;margin-top:6px"><table class="wk"><tr><th>שבוע</th><th>⚖️ ק״ג</th><th>🔥 קק״ל/יום</th><th>🚶 צעדים/יום</th><th>💧 ל׳/יום</th><th>😴 ש׳</th></tr>`;
+    rows.forEach((r,i)=>{const prev=rows[i+1];const dw=r.weight&&prev&&prev.weight?Math.round((r.weight-prev.weight)*10)/10:null;h+=`<tr><td>${i===0?'השבוע':hebShort(r.from)}</td><td>${r.weight??'–'}${dw!=null?` <span class="muted small">(${dw>0?'+':''}${dw})</span>`:''}</td><td>${r.kcal?Math.round(r.kcal):'–'}</td><td>${r.steps?Math.round(r.steps).toLocaleString('he-IL'):'–'}</td><td>${r.water?(r.water/1000).toFixed(1):'–'}</td><td>${r.sleep?r.sleep.toFixed(1):'–'}</td></tr>`;});
+    h+=`</table></div><div class="muted small" style="margin-top:6px">הקלוריות הן הערכה לפי המנות שסומנו; הטבלה מראה מגמה, לא חישוב מדויק.</div>`;}
   h+=`<div class="muted small" style="margin-top:10px">BMI הוא מדד כללי בלבד ולא ייעוץ רפואי. אין צורך להישקל כל יום — פעם בשבוע, באותה שעה, מספיק.</div></section>`;
   // הגדרות
   h+=`<h2 style="margin:20px 0 10px">⚙️ הגדרות</h2><section class="card"><form onsubmit="return saveSettings(event)">
   <label class="field"><span>שם</span><input class="input" name="name" value="${esc(st.name)}"></label>
-  <div class="row"><label class="field grow"><span>יעד כוסות מים</span><input class="input" type="number" min="1" max="20" name="waterGoal" value="${st.waterGoal}"></label><label class="field grow"><span>יעד שעות שינה</span><input class="input" type="number" step="0.5" min="4" max="12" name="sleepGoal" value="${st.sleepGoal}"></label></div>
+  <div class="row"><label class="field grow"><span>יעד מים (מ״ל)</span><input class="input" type="number" min="500" max="5000" step="50" name="waterGoalMl" value="${st.waterGoalMl}" inputmode="numeric"></label><label class="field grow"><span>יעד שעות שינה</span><input class="input" type="number" step="0.5" min="4" max="12" name="sleepGoal" value="${st.sleepGoal}"></label></div>
+  <div class="row"><label class="field grow"><span>יעד צעדים ביום</span><input class="input" type="number" min="1000" max="30000" step="500" name="stepsGoal" value="${st.stepsGoal}" inputmode="numeric"></label><label class="field grow"><span>משקל יעד (ק״ג, לא חובה)</span><input class="input" type="number" step="0.5" min="30" max="250" name="goalWeight" value="${st.goalWeight||''}" inputmode="decimal"></label></div>
   <label class="field"><span>גובה (ס״מ)</span><input class="input" type="number" min="100" max="230" name="height" value="${st.height||''}" placeholder="למשל 165" inputmode="numeric"></label>
   <div class="row"><label class="field grow"><span>שעת שינה רגילה</span><input class="input" type="time" name="bedtime" value="${st.bedtime}"></label><label class="field grow"><span>שעת קימה רגילה</span><input class="input" type="time" name="wake" value="${st.wake}"></label></div>
   <button class="btn block">שמרי הגדרות</button></form></section>`;
+  // תזכורות
+  const rm=st.reminders,perm=('Notification' in window)?Notification.permission:'unsupported',ti='style="width:auto;min-height:36px;padding:4px 8px;display:inline-block"';
+  h+=`<section class="card"><h3>🔔 תזכורות</h3><div class="muted small" style="margin:4px 0 10px">התראות מהאפליקציה עובדות כשהיא פתוחה (או ברקע באנדרואיד). כדי שיצלצלו תמיד — גם באייפון — ייצאי אותן ליומן הטלפון בכפתור למטה.</div>
+  <div class="row between" style="margin-bottom:8px"><span class="small">הרשאת התראות: <b>${perm==='granted'?'מאושרת ✅':perm==='denied'?'נחסמה ✖':perm==='unsupported'?'לא נתמך בדפדפן זה':'עוד לא אושרה'}</b></span>${perm==='default'?'<button class="btn sm" onclick="askNotify()">אפשרי התראות</button>':''}</div>
+  <form onsubmit="return saveReminders(event)" class="stack">
+  <label class="check"><input type="checkbox" name="water_on" ${rm.water.on?'checked':''}><span>💧 מים — כל <input class="input" type="number" name="water_every" min="1" max="6" value="${rm.water.every}" style="width:60px;min-height:36px;padding:4px 8px;display:inline-block"> שעות, בין <input class="input" type="time" name="water_from" value="${rm.water.from}" ${ti}> ל-<input class="input" type="time" name="water_to" value="${rm.water.to}" ${ti}></span></label>
+  <label class="check"><input type="checkbox" name="meals_on" ${rm.meals.on?'checked':''}><span>🍽 ארוחות — בוקר <input class="input" type="time" name="meals_breakfast" value="${rm.meals.breakfast}" ${ti}> צהריים <input class="input" type="time" name="meals_lunch" value="${rm.meals.lunch}" ${ti}> ערב <input class="input" type="time" name="meals_dinner" value="${rm.meals.dinner}" ${ti}></span></label>
+  <label class="check"><input type="checkbox" name="screen_on" ${rm.screen.on?'checked':''}><span>📵 להניח את הטלפון ב-<input class="input" type="time" name="screen_time" value="${rm.screen.time}" ${ti}></span></label>
+  <label class="check"><input type="checkbox" name="sleep_on" ${rm.sleep.on?'checked':''}><span>😴 ללכת לישון ב-<input class="input" type="time" name="sleep_time" value="${rm.sleep.time}" ${ti}></span></label>
+  <div class="row" style="margin-top:6px;gap:8px"><button class="btn grow">שמרי תזכורות</button><button type="button" class="btn ghost grow" onclick="exportIcs()">📆 ייצוא ליומן הטלפון</button></div></form>
+  <div class="muted small" style="margin-top:8px">הייצוא יוצר קובץ יומן (.ics) עם אירועים יומיים חוזרים והתראה לכל אחד. פותחים אותו בטלפון → "הוסף ליומן". לשינוי — מוחקים את האירועים מהיומן ומייצאים שוב.</div></section>`;
   h+=`<section class="card"><h3>💾 גיבוי</h3><div class="muted small" style="margin:4px 0 10px">הנתונים נשמרים רק בטלפון הזה. מומלץ לייצא גיבוי מדי פעם (למשל לוואטסאפ לעצמך).</div>
   <div class="stack"><button class="btn block" onclick="exportBackup()">📤 ייצוא גיבוי (קובץ)</button>
   <label class="btn ghost block" style="cursor:pointer">📥 ייבוא גיבוי מקובץ<input type="file" accept=".json,application/json" style="display:none" onchange="importBackup(this)"></label>
@@ -669,7 +722,7 @@ function renderMore(){
   <div class="muted small" style="margin-top:10px">נוצר: ${new Date(S.createdAt).toLocaleDateString('he-IL')} · עודכן: ${new Date(S.updatedAt).toLocaleString('he-IL')} · גרסת נתונים ${S.schemaVersion}</div></section>`;
   $('#view').innerHTML=h;
 }
-function saveSettings(ev){ev.preventDefault();const f=ev.target;Object.assign(S.settings,{name:f.name.value.trim()||'דבי',waterGoal:+f.waterGoal.value||8,sleepGoal:+f.sleepGoal.value||7.5,height:+f.height.value||null,bedtime:f.bedtime.value||'23:00',wake:f.wake.value||'07:00'});save();toast('ההגדרות נשמרו');renderMore();return false;}
+function saveSettings(ev){ev.preventDefault();const f=ev.target;Object.assign(S.settings,{name:f.name.value.trim()||'דבי',waterGoalMl:+f.waterGoalMl.value||2000,stepsGoal:+f.stepsGoal.value||6000,goalWeight:+f.goalWeight.value||null,sleepGoal:+f.sleepGoal.value||7.5,height:+f.height.value||null,bedtime:f.bedtime.value||'23:00',wake:f.wake.value||'07:00'});save();toast('ההגדרות נשמרו');renderMore();return false;}
 function saveWeight(ev){ev.preventDefault();const f=ev.target,kg=Math.round(+f.kg.value*10)/10,k=f.k.value||today();if(!kg)return false;addWeight(k,kg);toast('נשמר ⚖️');renderMore();return false;}
 function delWeight(k){S.weights=S.weights.filter(w=>w.k!==k);save();renderMore();}
 async function exportBackup(){
@@ -681,8 +734,46 @@ function importBackup(inp){const f=inp.files[0];if(!f)return;const r=new FileRea
 function restoreInternal(){const b=localStorage.getItem(BKEY);if(!b)return toast('אין גיבוי פנימי עדיין');try{const o=JSON.parse(b);if(!confirm(`לשחזר לגרסה מ-${new Date(o.updatedAt).toLocaleString('he-IL')}?`))return;S=migrate(o);save();render();toast('שוחזר ↩️');}catch(e){toast('הגיבוי הפנימי לא תקין');}}
 function resetAll(){if(!confirm('לאפס את כל הנתונים? זה ימחק את היומן, התפריט והמאגר.'))return;if(!confirm('בטוחה? אי אפשר לבטל (אלא דרך "שחזור מהגיבוי הפנימי").'))return;S=defaultState();save();render();toast('אופס');}
 
+/* ===================== reminders ===================== */
+function askNotify(){if(!('Notification' in window))return toast('הדפדפן לא תומך בהתראות');Notification.requestPermission().then(()=>renderMore());}
+function saveReminders(ev){ev.preventDefault();const f=ev.target,g=n=>f[n].value,c=n=>f[n].checked;
+  S.settings.reminders={water:{on:c('water_on'),every:+g('water_every')||2,from:g('water_from')||'08:00',to:g('water_to')||'22:00'},meals:{on:c('meals_on'),breakfast:g('meals_breakfast')||'08:00',lunch:g('meals_lunch')||'13:00',dinner:g('meals_dinner')||'19:00'},screen:{on:c('screen_on'),time:g('screen_time')||'22:00'},sleep:{on:c('sleep_on'),time:g('sleep_time')||'23:00'}};
+  save();toast('התזכורות נשמרו 🔔');if('Notification' in window&&Notification.permission==='default')askNotify();return false;}
+const toMin=t=>{const [h,m]=t.split(':').map(Number);return h*60+m;};
+// כל התזכורות של היום כרשימת {key,time,title,body,kind}
+function todaysReminders(){const r=S.settings.reminders,out=[];
+  if(r.water.on){for(let t=toMin(r.water.from);t<=toMin(r.water.to);t+=r.water.every*60){const hh=pad(Math.floor(t/60))+':'+pad(t%60);out.push({key:'water-'+hh,time:hh,title:'💧 זמן לשתות',body:'כוס מים עכשיו — הגוף יגיד תודה',kind:'water'});}}
+  if(r.meals.on)for(const m of MEALS.filter(x=>x.id!=='snack'))out.push({key:'meal-'+m.id,time:r.meals[m.id],title:`${m.ic} ארוחת ${m.l}`,body:'מה כדאי לאכול? פתחי את האפליקציה להצעות',kind:m.id});
+  if(r.screen.on)out.push({key:'screen',time:r.screen.time,title:'📵 זמן להניח את הטלפון',body:'שעה בלי מסך לפני השינה עוזרת להירדם',kind:'screen'});
+  if(r.sleep.on)out.push({key:'sleep',time:r.sleep.time,title:'😴 לילה טוב',body:'זו השעה שקבעת ללכת לישון',kind:'sleep'});
+  return out;}
+function notify(title,body){toast(title);if(!('Notification' in window)||Notification.permission!=='granted')return;
+  const opts={body,icon:'icon-192.png',badge:'icon-192.png',tag:'debbie-'+Date.now(),lang:'he',dir:'rtl'};
+  const fallback=()=>{try{new Notification(title,opts);}catch(e){}};
+  if(navigator.serviceWorker&&navigator.serviceWorker.controller)navigator.serviceWorker.ready.then(r=>r.showNotification(title,opts)).catch(fallback);else fallback();}
+function reminderTick(){const d=day(),now=toMin(nowTime());
+  for(const r of todaysReminders()){const t=toMin(r.time);if(now<t||now>t+2||d.fired.includes(r.key))continue;
+    if(r.kind==='water'&&d.lastWaterT&&Date.now()-d.lastWaterT<S.settings.reminders.water.every*3600e3*0.8){d.fired.push(r.key);continue;} // שתתה לא מזמן — לא מציקים
+    if(['breakfast','lunch','dinner'].includes(r.kind)&&d.meals[r.kind]&&d.meals[r.kind].eaten){d.fired.push(r.key);continue;}
+    d.fired.push(r.key);save();notify(r.title,r.body);}}
+setInterval(reminderTick,30000);
+// ייצוא ליומן (.ics): אירועים יומיים חוזרים עם התראה — עובד בכל טלפון
+async function exportIcs(){const rs=todaysReminders();if(!rs.length)return toast('סמני קודם אילו תזכורות את רוצה, ושמרי');
+  const stamp=new Date().toISOString().replace(/[-:]/g,'').slice(0,15)+'Z',d0=today().replace(/-/g,'');
+  const ev=r=>['BEGIN:VEVENT',`UID:debbie-${r.key}@health`,`DTSTAMP:${stamp}`,`DTSTART:${d0}T${r.time.replace(':','')}00`,'DURATION:PT5M','RRULE:FREQ=DAILY',`SUMMARY:${r.title}`,`DESCRIPTION:${r.body}`,'BEGIN:VALARM','TRIGGER:PT0M','ACTION:DISPLAY',`DESCRIPTION:${r.title}`,'END:VALARM','END:VEVENT'].join('\r\n');
+  const txt=['BEGIN:VCALENDAR','VERSION:2.0','PRODID:-//debbie-health//HE','CALSCALE:GREGORIAN','X-WR-CALNAME:תזכורות בריאות',...rs.map(ev),'END:VCALENDAR'].join('\r\n');
+  const name='debbie-reminders.ics';
+  try{if(navigator.share&&navigator.canShare){const file=new File([txt],name,{type:'text/calendar'});if(navigator.canShare({files:[file]})){await navigator.share({files:[file],title:'תזכורות בריאות'});return;}}}catch(e){if(e.name==='AbortError')return;}
+  const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([txt],{type:'text/calendar'}));a.download=name;document.body.appendChild(a);a.click();a.remove();toast('קובץ היומן נשמר');}
+
 /* ===================== boot ===================== */
-load();render();
+load();
+// קליטת נתונים מהכתובת (לאוטומציה: Tasker / MacroDroid פותחים ?steps=5400 או ?water=250)
+(()=>{const q=new URLSearchParams(location.search);let got=false;
+  if(q.has('steps')){const v=Math.round(+q.get('steps'));if(v>0){day().steps=v;got=true;}}
+  if(q.has('water')){const v=Math.round(+q.get('water'));if(v>0){day().waterMl+=v;day().lastWaterT=Date.now();got=true;}}
+  if(got){save();history.replaceState(null,'',location.pathname);setTimeout(()=>toast('התקבל מהאוטומציה ✅'),300);}})();
+render();
 document.addEventListener('visibilitychange',()=>{if(!document.hidden)render();});
 // service worker — התקנה כאפליקציה + אופליין (עובד רק מכתובת https, לא מקובץ מקומי)
 if('serviceWorker' in navigator&&location.protocol.startsWith('http'))navigator.serviceWorker.register('sw.js').catch(()=>{});

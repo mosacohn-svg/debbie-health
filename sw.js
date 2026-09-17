@@ -1,6 +1,6 @@
 // Service worker: מאפשר התקנה כאפליקציה + עבודה אופליין.
 // כשיש רשת — מביא את הגרסה החדשה; כשאין — משתמש בעותק השמור.
-const CACHE = 'debbie-health-v2';
+const CACHE = 'debbie-health-v3';
 const ASSETS = ['./', './index.html', './manifest.json', './icon-192.png', './icon-512.png'];
 self.addEventListener('install', e => {
   e.waitUntil(caches.open(CACHE).then(c => c.addAll(ASSETS)).then(() => self.skipWaiting()));
